@@ -1,0 +1,55 @@
+-- Run this on your MariaDB (TrueNAS) as root
+-- Drops old tables (if present) and recreates schema expected by the app
+
+USE `database_name`; -- Replace with your actual database name
+
+-- drop in dependency order
+DROP TABLE IF EXISTS `logs`;
+DROP TABLE IF EXISTS `documents`;
+DROP TABLE IF EXISTS `patients`;
+DROP TABLE IF EXISTS `users`;
+
+CREATE TABLE `users` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `username` VARCHAR(255) NOT NULL UNIQUE,
+  `passwordHash` VARCHAR(255) NOT NULL,
+  `displayName` VARCHAR(255) NOT NULL,
+  `role` ENUM('normal','editor','admin') NOT NULL DEFAULT 'normal',
+  `lastLogin` DATETIME NULL,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `patients` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL,
+  `dob` DATE NULL,
+  `notes` TEXT NULL,
+  `lastSeenBy` INT UNSIGNED NULL,
+  `createdBy` INT UNSIGNED NULL,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT `fk_patients_createdBy_users_id` FOREIGN KEY (`createdBy`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_patients_lastSeenBy_users_id` FOREIGN KEY (`lastSeenBy`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `documents` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `title` VARCHAR(255) NOT NULL,
+  `content` TEXT NULL,
+  `patientId` INT UNSIGNED NOT NULL,
+  `createdBy` INT UNSIGNED NULL,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT `fk_documents_patient` FOREIGN KEY (`patientId`) REFERENCES `patients`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_documents_createdBy_users` FOREIGN KEY (`createdBy`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `logs` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `userId` INT UNSIGNED NULL,
+  `action` VARCHAR(255) NOT NULL,
+  `details` TEXT NULL,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT `fk_logs_user` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

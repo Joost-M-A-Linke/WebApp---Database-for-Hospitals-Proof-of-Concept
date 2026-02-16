@@ -1,0 +1,8 @@
+-- Replace <BCRYPT_HASH> with the bcrypt hash generated on the app host
+USE `database_name`;
+
+INSERT INTO `users` (username, passwordHash, displayName, role, createdAt, updatedAt)
+VALUES ('admin', '<BCRYPT_HASH>', 'Administrator', 'admin', NOW(), NOW());
+
+-- Optionally remove an old user by username (replace OLD_USERNAME)
+-- DELETE FROM users WHERE username = 'OLD_USERNAME';

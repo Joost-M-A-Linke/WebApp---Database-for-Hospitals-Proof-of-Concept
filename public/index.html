@@ -1,0 +1,337 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Dashboard</title>
+    <style>
+      :root{
+        --accent:#2b6cb0;
+        --muted:#666;
+        --success:#22a346;
+        --warning:#e0a800;
+        --danger:#cb2431;
+        --bg:#0f172a;
+        --card:#1e293b;
+        --border:#334155;
+        --text:#e2e8f0
+      }
+      *{box-sizing:border-box}
+
+      body{
+        font-family:'Segoe UI',Trebuchet MS,sans-serif;
+        margin:0;
+        background:linear-gradient(135deg,var(--bg),#1a2847);
+        color:var(--text);min-height:100vh
+      }
+
+      .hidden{
+        display:none!important
+      }
+
+      header{
+        background:linear-gradient(90deg,var(--accent),#4aa3ff);
+        color:#fff;padding:16px;
+        box-shadow:0 4px 20px rgba(0,0,0,0.3)
+      }
+
+      .container{
+        padding:20px;
+        max-width:1100px;
+        margin:0 auto
+      }
+
+      .row{
+        display:flex;
+        gap:12px;
+        align-items:center
+      }
+
+      input,textarea,select{
+        padding:10px;
+        border:1px solid var(--border);
+        border-radius:6px;
+        background:#0f172a;
+        color:var(--text);
+        font-family:inherit
+      }
+
+      input:focus,textarea:focus,select:focus{
+        outline:none;
+        border-color:var(--accent);
+        box-shadow:0 0 0 3px rgba(43,108,176,0.1)
+      }
+
+      button{
+        padding:10px 16px;
+        border:none;
+        cursor:pointer;
+        border-radius:6px;
+        font-weight:500;
+        transition:all 0.2s;
+        background:linear-gradient(135deg,var(--accent),#4aa3ff);
+        color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.2)
+      }
+
+      button:hover{
+        transform:translateY(-1px);
+        box-shadow:0 4px 12px rgba(43,108,176,0.3)
+      }
+
+      button:active{
+        transform:translateY(0)
+      }
+
+      button.danger{
+        background:linear-gradient(135deg,var(--danger),#e74c3c)
+      }
+
+      button.success{
+        background:linear-gradient(135deg,var(--success),#27ae60)
+      }
+
+      button.warning{
+        background:linear-gradient(135deg,var(--warning),#f39c12)
+      }
+
+      .role-admin{
+        color:#ff6b6b;
+        font-weight:bold
+      }
+
+      .role-editor{
+        color:#ffd43b;
+        font-weight:bold
+      }
+
+      .role-normal{
+        color:#51cf66;
+        font-weight:bold
+      }
+
+      nav a{
+        color:#fff;
+        margin-right:16px;
+        text-decoration:none;
+        transition:opacity 0.2s;
+        font-weight:500
+      }
+
+      nav a:hover{
+        opacity:0.8
+      }
+
+      nav strong{
+        font-size:1.1em
+      }
+
+      .card{
+        background:var(--card);
+        border-radius:12px;
+        box-shadow:0 8px 32px rgba(0,0,0,0.3);
+        padding:16px;
+        margin:12px 0;
+        border:1px solid var(--border)
+      }
+
+      .card h2,.card h3,.card h4{
+        margin:0 0 12px 0;
+        color:#fff
+      }
+
+      .patient{
+        border:1px solid var(--border);
+        padding:12px;
+        border-radius:8px;
+        margin:8px 0;
+        background:rgba(43,108,176,0.05);
+        border-left:4px solid var(--accent);
+        transition:all 0.2s
+      }
+
+      .patient:hover{
+        background:rgba(43,108,176,0.1);
+        transform:translateX(2px)
+      }
+
+      .patient button{
+        padding:6px 12px;
+        font-size:0.9em;
+        margin-right:6px;
+        margin-top:8px
+      }
+
+      .patients-list{
+        max-height:480px;
+        overflow-y:auto
+      }
+
+      .patients-list::-webkit-scrollbar{
+        width:6px
+      }
+
+      .patients-list::-webkit-scrollbar-track{
+        background:var(--bg);
+        border-radius:3px
+      }
+
+      .patients-list::-webkit-scrollbar-thumb{
+        background:var(--accent);
+        border-radius:3px
+      }
+
+      .patients-list::-webkit-scrollbar-thumb:hover{
+        background:#4aa3ff
+      }
+
+      .grid{
+        display:grid;
+        grid-template-columns:1fr 320px;
+        gap:16px
+      }
+
+      .modal{
+        position:fixed;
+        left:0;
+        right:0;
+        top:0;
+        bottom:0;
+        background:rgba(0,0,0,0.7);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        z-index:9999
+      }
+
+      .modal .card{
+        width:640px;
+        z-index:10000;
+        max-height:90vh;
+        overflow-y:auto
+      }
+
+      .modal button{
+        cursor:pointer;
+        pointer-events:auto
+      }
+
+      .modal-spacer{
+        margin-top:12px
+      }
+
+      table{
+        width:100%;
+        border-collapse:collapse
+      }
+
+      th,td{
+        padding:10px;
+        border-bottom:1px solid var(--border);
+        text-align:left;
+        color:var(--text)
+      }
+
+      th{
+        background:rgba(43,108,176,0.1);
+        font-weight:600
+      }
+
+      tr:hover{
+        background:rgba(43,108,176,0.05)
+      }
+
+      small{
+        color:#94a3b8
+      }
+
+      h1{
+        text-align:center;
+        background:linear-gradient(135deg,var(--accent),#4aa3ff);
+        background-clip:text;
+        -webkit-background-clip:text;
+        -webkit-text-fill-color:transparent;
+        margin:20px 0
+      }
+      
+    </style>
+  </head>
+  <body>
+    <h1>Lokales Dashboard</h1>
+
+    <div id="login-section" class="container">
+      <header>
+        <nav>
+          <a href="#">Proof of concept</a>
+        </nav>
+      </header>
+      <div class="card" style="max-width:480px;margin:24px auto">
+        <h2>Login</h2>
+        <div class="row"><input id="username" placeholder="username" /></div>
+        <div class="row"><input id="password" placeholder="password" type="password" /></div>
+        <div class="row"><button id="login-btn">Log in</button></div>
+      </div>
+    </div>
+
+    <div id="dashboard" class="hidden container">
+      <header>
+        <nav>
+          <a href="#" id="nav-dashboard">Dashboard</a>
+          <a href="#" id="nav-patients">Patienten</a>
+          <a href="#" id="nav-deleted" class="hidden">Gelöschte Patienten</a>
+          <a href="#" id="nav-logs">Logs</a>
+          <a href="#" id="nav-users" class="hidden">Benutzer</a>
+          <span style="float:right"><button id="logout">Log out</button></span>
+        </nav>
+      </header>
+      <div class="grid">
+        <div>
+          <div id="page-dashboard" class="card">
+            <h3>Willkommen, <span id="displayName"></span></h3>
+            <p><small>Rolle: <span id="role"></span> • Letzter login: <span id="lastLogin"></span></small></p>
+            <h4>Quick Search</h4>
+            <div class="row"><input id="search-q" placeholder="Suche Patienten-Name, id oder dob" /> <button id="search-btn">Suche</button></div>
+            <div id="search-results" class="patients-list"></div>
+          </div>
+
+          <div id="page-patients" class="card hidden">
+            <h3>Patienten</h3>
+            <div class="row"><input id="p-name" placeholder="Name" /> <input id="p-dob" placeholder="YYYY-MM-DD" /> <button id="add-patient">Patient erstellen</button></div>
+            <div id="patients" class="patients-list"></div>
+          </div>
+
+          <div id="page-deleted" class="card hidden">
+            <h3>Gelöschte Patienten</h3>
+            <div id="deleted-patients" class="patients-list"></div>
+          </div>
+
+          <div id="page-logs" class="card hidden">
+            <h3>Logs</h3>
+            <div id="logs"></div>
+          </div>
+
+          <div id="page-users" class="card hidden">
+            <h3>Benutzer</h3>
+            <div id="users"></div>
+          </div>
+        </div>
+
+        <aside>
+          <div class="card">
+            <h4>Patienten Details</h4>
+            <div id="patient-detail">Wähle einen Patienten</div>
+          </div>
+        </aside>
+      </div>
+
+      <div id="modal" class="hidden modal">
+        <div class="card">
+          <h3 id="modal-title"></h3>
+          <div id="modal-body"></div>
+          <div style="text-align:right;margin-top:8px"><button id="modal-save">Speichern</button> <button id="modal-cancel">Abbrechen</button></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
