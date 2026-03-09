@@ -3,7 +3,7 @@ const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
 const path = require('path');
-const { sequelize, User, Patient, Document, Log } = require('./models');
+const { sequelize, User, Patient, Document, Log, Recipe, Ingredient, RecipeIngredient, CookingStep } = require('./models');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -239,11 +239,281 @@ app.get('/api/logs', requireAuth, requireRole('admin'), async (req, res) => {
   res.json({ logs });
 });
 
+// ==================== RECIPE ENDPOINTS ====================
+
+// Get all recipes with limited info (for list view)
+app.get('/api/recipes', requireAuth, async (req, res) => {
+  try {
+    const { Op } = require('sequelize');
+    const recipes = await Recipe.findAll({
+      include: [{
+        model: RecipeIngredient,
+        include: [{ model: Ingredient }]
+      }],
+      order: [['createdAt', 'DESC']]
+    });
+    
+    // Format for display - include preview of ingredients
+    const formatted = recipes.map(r => ({
+      id: r.id,
+      name: r.name,
+      prepTime: r.prepTime,
+      ingredientPreview: r.RecipeIngredients.slice(0, 3).map(ri => ri.Ingredient.name).join(', '),
+      createdAt: r.createdAt
+    }));
+    
+    res.json({ recipes: formatted });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'failed to load recipes' });
+  }
+});
+
+// Search recipes by name
+app.get('/api/recipes/search/:query', requireAuth, async (req, res) => {
+  try {
+    const { query } = req.params;
+    const { Op } = require('sequelize');
+    
+    const recipes = await Recipe.findAll({
+      where: {
+        name: { [Op.like]: `%${query}%` }
+      },
+      include: [{
+        model: RecipeIngredient,
+        include: [{ model: Ingredient }]
+      }],
+      order: [['name', 'ASC']],
+      limit: 50
+    });
+    
+    // Format for display
+    const formatted = recipes.map(r => ({
+      id: r.id,
+      name: r.name,
+      prepTime: r.prepTime,
+      ingredientPreview: r.RecipeIngredients.slice(0, 3).map(ri => ri.Ingredient.name).join(', '),
+      createdAt: r.createdAt
+    }));
+    
+    res.json({ recipes: formatted });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'search failed' });
+  }
+});
+
+// Get full recipe detail
+app.get('/api/recipes/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const recipe = await Recipe.findByPk(id, {
+      include: [
+        {
+          model: RecipeIngredient,
+          include: [{ model: Ingredient }]
+        },
+        {
+          model: CookingStep,
+          order: [['stepNumber', 'ASC']]
+        }
+      ]
+    });
+    
+    if (!recipe) return res.status(404).json({ error: 'recipe not found' });
+    
+    // Format ingredients
+    const ingredients = recipe.RecipeIngredients.map(ri => ({
+      id: ri.id,
+      name: ri.Ingredient.name,
+      amount: ri.amount,
+      unit: ri.unit
+    }));
+    
+    // Separate preparation and cooking steps
+    const prepSteps = recipe.CookingSteps.filter(s => s.stepType === 'preparation');
+    const cookingSteps = recipe.CookingSteps.filter(s => s.stepType === 'cooking');
+    
+    res.json({
+      recipe: {
+        id: recipe.id,
+        name: recipe.name,
+        prepTime: recipe.prepTime,
+        notes: recipe.notes,
+        ingredients,
+        prepSteps: prepSteps.map(s => ({ stepNumber: s.stepNumber, description: s.description })),
+        cookingSteps: cookingSteps.map(s => ({ stepNumber: s.stepNumber, description: s.description })),
+        createdAt: recipe.createdAt
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'failed to load recipe' });
+  }
+});
+
+// Create new recipe
+app.post('/api/recipes', requireAuth, async (req, res) => {
+  try {
+    const { name, prepTime, notes, ingredients, prepSteps, cookingSteps } = req.body;
+    
+    if (!name) return res.status(400).json({ error: 'recipe name required' });
+    if (!Array.isArray(ingredients) || ingredients.length === 0) {
+      return res.status(400).json({ error: 'at least one ingredient required' });
+    }
+    
+    // Create recipe
+    const recipe = await Recipe.create({
+      name,
+      prepTime: prepTime || null,
+      notes: notes || '',
+      createdBy: req.session.userId
+    });
+    
+    // Add ingredients
+    for (const ing of ingredients) {
+      let ingredient = await Ingredient.findOne({ where: { name: ing.name } });
+      if (!ingredient) {
+        ingredient = await Ingredient.create({ name: ing.name });
+      }
+      await RecipeIngredient.create({
+        recipeId: recipe.id,
+        ingredientId: ingredient.id,
+        amount: ing.amount || null,
+        unit: ing.unit || null
+      });
+    }
+    
+    // Add preparation steps
+    if (Array.isArray(prepSteps)) {
+      for (let i = 0; i < prepSteps.length; i++) {
+        await CookingStep.create({
+          recipeId: recipe.id,
+          stepNumber: i + 1,
+          stepType: 'preparation',
+          description: prepSteps[i]
+        });
+      }
+    }
+    
+    // Add cooking steps
+    if (Array.isArray(cookingSteps)) {
+      for (let i = 0; i < cookingSteps.length; i++) {
+        await CookingStep.create({
+          recipeId: recipe.id,
+          stepNumber: i + 1,
+          stepType: 'cooking',
+          description: cookingSteps[i]
+        });
+      }
+    }
+    
+    res.json({ ok: true, recipeId: recipe.id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'failed to create recipe' });
+  }
+});
+
+// Update recipe
+app.put('/api/recipes/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, prepTime, notes, ingredients, prepSteps, cookingSteps } = req.body;
+    
+    const recipe = await Recipe.findByPk(id);
+    if (!recipe) return res.status(404).json({ error: 'recipe not found' });
+    
+    // Update basic info
+    if (name) recipe.name = name;
+    if (prepTime !== undefined) recipe.prepTime = prepTime;
+    if (notes !== undefined) recipe.notes = notes;
+    await recipe.save();
+    
+    // Update ingredients if provided
+    if (Array.isArray(ingredients)) {
+      await RecipeIngredient.destroy({ where: { recipeId: id } });
+      
+      for (const ing of ingredients) {
+        let ingredient = await Ingredient.findOne({ where: { name: ing.name } });
+        if (!ingredient) {
+          ingredient = await Ingredient.create({ name: ing.name });
+        }
+        await RecipeIngredient.create({
+          recipeId: recipe.id,
+          ingredientId: ingredient.id,
+          amount: ing.amount || null,
+          unit: ing.unit || null
+        });
+      }
+    }
+    
+    // Update cooking steps if provided
+    if (Array.isArray(cookingSteps) || Array.isArray(prepSteps)) {
+      await CookingStep.destroy({ where: { recipeId: id } });
+      
+      if (Array.isArray(prepSteps)) {
+        for (let i = 0; i < prepSteps.length; i++) {
+          await CookingStep.create({
+            recipeId: recipe.id,
+            stepNumber: i + 1,
+            stepType: 'preparation',
+            description: prepSteps[i]
+          });
+        }
+      }
+      
+      if (Array.isArray(cookingSteps)) {
+        for (let i = 0; i < cookingSteps.length; i++) {
+          await CookingStep.create({
+            recipeId: recipe.id,
+            stepNumber: i + 1,
+            stepType: 'cooking',
+            description: cookingSteps[i]
+          });
+        }
+      }
+    }
+    
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'failed to update recipe' });
+  }
+});
+
+// Delete recipe
+app.delete('/api/recipes/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const recipe = await Recipe.findByPk(id);
+    if (!recipe) return res.status(404).json({ error: 'recipe not found' });
+    
+    // Delete related records
+    await RecipeIngredient.destroy({ where: { recipeId: id } });
+    await CookingStep.destroy({ where: { recipeId: id } });
+    await recipe.destroy();
+    
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'failed to delete recipe' });
+  }
+});
+
+// ==================== END RECIPE ENDPOINTS ====================
+
 (async () => {
   try {
     await sequelize.authenticate();
     console.log('DB connected');
-    await sequelize.sync();
+    
+    // Disable foreign key checks, sync tables, then re-enable
+    await sequelize.query('SET FOREIGN_KEY_CHECKS=0');
+    await sequelize.sync({ alter: false });
+    await sequelize.query('SET FOREIGN_KEY_CHECKS=1');
+    
     app.listen(PORT, () => console.log('Server listening on', PORT));
   } catch (err) {
     console.error('Failed to start', err);

@@ -13,6 +13,10 @@ const User = require('./user')(sequelize);
 const Patient = require('./patient')(sequelize);
 const Document = require('./document')(sequelize);
 const Log = require('./log')(sequelize);
+const Recipe = require('./recipe')(sequelize);
+const Ingredient = require('./ingredient')(sequelize);
+const RecipeIngredient = require('./recipeIngredient')(sequelize);
+const CookingStep = require('./cookingStep')(sequelize);
 
 User.hasMany(Patient, { foreignKey: 'createdBy', sourceKey: 'id' });
 Patient.belongsTo(User, { foreignKey: 'createdBy', targetKey: 'id', as: 'creator' });
@@ -29,4 +33,17 @@ Document.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
 User.hasMany(Log, { foreignKey: 'userId' });
 Log.belongsTo(User, { foreignKey: 'userId' });
 
-module.exports = { sequelize, User, Patient, Document, Log };
+// Recipe relationships
+User.hasMany(Recipe, { foreignKey: 'createdBy', constraints: false });
+Recipe.belongsTo(User, { foreignKey: 'createdBy', as: 'creator', constraints: false });
+
+Recipe.hasMany(CookingStep, { foreignKey: 'recipeId', constraints: false });
+CookingStep.belongsTo(Recipe, { foreignKey: 'recipeId', constraints: false });
+
+Recipe.hasMany(RecipeIngredient, { foreignKey: 'recipeId', constraints: false });
+RecipeIngredient.belongsTo(Recipe, { foreignKey: 'recipeId', constraints: false });
+
+RecipeIngredient.belongsTo(Ingredient, { foreignKey: 'ingredientId', constraints: false });
+Ingredient.hasMany(RecipeIngredient, { foreignKey: 'ingredientId', constraints: false });
+
+module.exports = { sequelize, User, Patient, Document, Log, Recipe, Ingredient, RecipeIngredient, CookingStep };
